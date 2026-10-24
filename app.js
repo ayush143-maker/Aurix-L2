@@ -21,6 +21,10 @@ const formulaDetail = byId('formula-detail');
 let searchData = null;
 let selectedTrackId = null;
 let currentQuery = '';
+let activeSearchController = null;
+let latestSearchToken = 0;
+const SEARCH_CACHE_TTL_MS = 60_000;
+const searchCache = new Map();
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -95,7 +99,7 @@ function renderStats() {
   searchStats.innerHTML = `
     <span class="stat-chip"><strong>${searchData.referenceTracks.length}</strong> references</span>
     <span class="stat-chip"><strong>${searchData.videoCandidates.length}</strong> videos</span>
-    <span class="stat-chip"><strong>${meta.successfulSearches || 0}/5</strong> lookups</span>
+    <span class="stat-chip"><strong>${meta.successfulSearches || 0}/4</strong> lookups</span>
   `;
 }
 
@@ -234,31 +238,52 @@ function renderAll() {
 }
 
 async function performSearch(query) {
-  const normalizedQuery = query.trim();
+  const normalizedQuery = query.trim().replace(/\s+/g, ' ');
   if (normalizedQuery.length < 2) {
     showFeedback('Enter at least 2 characters for a song search.', 'error');
     return;
   }
-
+  const searchToken = ++latestSearchToken;
+  if (activeSearchController) activeSearchController.abort();
+  activeSearchController = null;
   currentQuery = normalizedQuery;
+  const cacheKey = normalizedQuery.toLocaleLowerCase();
+  const cached = searchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    searchData = cached.payload;
+    selectedTrackId = searchData.referenceTracks[0]?.videoId || null;
+    resultsSection.classList.remove('hidden');
+    renderAll();
+    setLoading(false);
+    showFeedback(`Loaded recent results for “${normalizedQuery}”.`, 'success');
+    if (!searchData.referenceTracks.length) {
+      showFeedback('No YT Music reference was found in the saved results. Add the artist name for a better match.', 'warning');
+    }
+    return;
+  }
+  if (cached) searchCache.delete(cacheKey);
+  const controller = new AbortController();
+  activeSearchController = controller;
   searchData = null;
   selectedTrackId = null;
   setLoading(true);
-  loadingTitle.textContent = 'Searching Piped instances';
-  loadingCopy.textContent = 'Finding YT Music references and collecting video candidates…';
-
+  loadingTitle.textContent = 'Searching music + video sources';
+  loadingCopy.textContent = 'Looking up the reference and video candidates in parallel…';
   try {
     const response = await fetch(`/api/search?query=${encodeURIComponent(normalizedQuery)}`, {
       headers: { accept: 'application/json' },
+      signal: controller.signal,
     });
     const payload = await response.json().catch(() => ({}));
+    if (searchToken !== latestSearchToken) return;
     if (!response.ok) throw new Error(payload.message || `Search failed (${response.status}).`);
-
     searchData = {
       ...payload,
       referenceTracks: Array.isArray(payload.referenceTracks) ? payload.referenceTracks : [],
       videoCandidates: Array.isArray(payload.videoCandidates) ? payload.videoCandidates : [],
     };
+    searchCache.set(cacheKey, { payload: searchData, expiresAt: Date.now() + SEARCH_CACHE_TTL_MS });
+    while (searchCache.size > 12) searchCache.delete(searchCache.keys().next().value);
     selectedTrackId = searchData.referenceTracks[0]?.videoId || null;
     resultsSection.classList.remove('hidden');
     renderAll();
@@ -271,10 +296,14 @@ async function performSearch(query) {
       showFeedback('Piped returned video candidates but no YT Music song reference. The list is ranked against the search text only; try adding the artist name.', 'warning');
     }
   } catch (error) {
+    if (error?.name === 'AbortError' || searchToken !== latestSearchToken) return;
     resultsSection.classList.add('hidden');
     showFeedback(`${error.message || 'Something went wrong.'} The backend tries several Piped instances automatically. Open /api/health on this deployment to see whether Piped is reachable.`, 'error');
   } finally {
-    setLoading(false);
+    if (searchToken === latestSearchToken) {
+      if (activeSearchController === controller) activeSearchController = null;
+      setLoading(false);
+    }
   }
 }
 
