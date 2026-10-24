@@ -1,4 +1,5 @@
 const videoRoot = document.getElementById('video-results');
+const referenceRoot = document.getElementById('reference-tracks');
 const resultsRoot = document.getElementById('results-section');
 const MAX_RESULTS = 7;
 
@@ -15,51 +16,80 @@ function safeVideoId(url) {
   return '';
 }
 
-function addInlinePlayers() {
-  if (!videoRoot) return;
-  const cards = [...videoRoot.querySelectorAll('.video-card')];
-  cards.forEach((card, index) => {
-    card.hidden = index >= MAX_RESULTS;
-    if (index >= MAX_RESULTS) return;
-    const thumb = card.querySelector('.video-thumbnail');
-    if (!thumb || thumb.dataset.playerReady) return;
-    const id = safeVideoId(thumb.getAttribute('href') || '');
-    if (!id || !/^[a-zA-Z0-9_-]{6,20}$/.test(id)) return;
-    thumb.dataset.playerReady = 'true';
-    thumb.classList.add('inline-play-ready');
-    const play = document.createElement('button');
-    play.type = 'button';
-    play.className = 'play-inline';
-    play.setAttribute('aria-label', 'Play video inside TrackMatch');
-    play.innerHTML = '<span aria-hidden="true">▶</span>';
-    play.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const frame = document.createElement('iframe');
-      frame.className = 'inline-player';
-      frame.title = 'YouTube video player';
-      frame.loading = 'lazy';
-      frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-      frame.allowFullscreen = true;
-      frame.referrerPolicy = 'strict-origin-when-cross-origin';
-      frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&playsinline=1&rel=0';
-      thumb.replaceChildren(frame);
-      thumb.classList.add('is-playing');
-      const existing = card.querySelector('.player-caption');
-      if (!existing) {
-        const caption = document.createElement('div');
-        caption.className = 'player-caption';
-        caption.innerHTML = '<span>Playing inside TrackMatch</span><a href="' + thumb.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" target="_blank" rel="noreferrer">Watch on YouTube ↗</a>';
-        const info = card.querySelector('.video-info');
-        if (info) info.append(caption);
-      }
-    });
-    thumb.append(play);
-  });
+function mountPlayer(container, id, title, externalUrl) {
+  const frame = document.createElement('iframe');
+  frame.className = 'inline-player';
+  frame.title = title || 'YouTube player';
+  frame.loading = 'lazy';
+  frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&playsinline=1&rel=0';
+  container.replaceChildren(frame);
+  container.classList.add('is-playing');
+  if (externalUrl) {
+    const caption = document.createElement('div');
+    caption.className = 'player-caption';
+    const note = document.createElement('span');
+    note.textContent = 'Playing inside TrackMatch';
+    const link = document.createElement('a');
+    link.href = externalUrl;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.textContent = 'Watch on YouTube ↗';
+    caption.append(note, link);
+    container.parentElement?.append(caption);
+  }
 }
 
-if (videoRoot) {
-  new MutationObserver(addInlinePlayers).observe(videoRoot, { childList: true, subtree: true });
-  addInlinePlayers();
+function addInlinePlayers() {
+  if (videoRoot) {
+    const cards = [...videoRoot.querySelectorAll('.video-card')];
+    cards.forEach((card, index) => {
+      card.hidden = index >= MAX_RESULTS;
+      if (index >= MAX_RESULTS) return;
+      const thumb = card.querySelector('.video-thumbnail');
+      if (!thumb || thumb.dataset.playerReady) return;
+      const id = safeVideoId(thumb.getAttribute('href') || '');
+      if (!id || !/^[a-zA-Z0-9_-]{6,20}$/.test(id)) return;
+      thumb.dataset.playerReady = 'true';
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'play-inline';
+      play.setAttribute('aria-label', 'Play video inside TrackMatch');
+      play.innerHTML = '<span aria-hidden="true">▶</span>';
+      play.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        mountPlayer(thumb, id, card.querySelector('.video-title')?.textContent || 'YouTube video', thumb.href);
+      });
+      thumb.append(play);
+    });
+  }
+
+  if (referenceRoot) {
+    referenceRoot.querySelectorAll('.reference-card').forEach((card) => {
+      if (card.dataset.audioPlayerReady) return;
+      const id = card.dataset.trackId;
+      const thumb = card.querySelector('.reference-thumb');
+      if (!id || !thumb || !/^[a-zA-Z0-9_-]{6,20}$/.test(id)) return;
+      card.dataset.audioPlayerReady = 'true';
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'play-inline reference-play';
+      play.setAttribute('aria-label', 'Play reference track inside TrackMatch');
+      play.innerHTML = '<span aria-hidden="true">▶</span>';
+      play.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        mountPlayer(thumb, id, card.querySelector('.reference-title')?.textContent || 'Reference track', 'https://www.youtube.com/watch?v=' + encodeURIComponent(id));
+      });
+      thumb.append(play);
+    });
+  }
 }
+
+if (videoRoot) new MutationObserver(addInlinePlayers).observe(videoRoot, { childList: true, subtree: true });
+if (referenceRoot) new MutationObserver(addInlinePlayers).observe(referenceRoot, { childList: true, subtree: true });
 if (resultsRoot) new MutationObserver(addInlinePlayers).observe(resultsRoot, { childList: true, subtree: true });
+addInlinePlayers();
