@@ -1,4 +1,5 @@
 import { rankCandidates, formatDuration } from './lib/scoring.js';
+import { thumbnailCandidates } from './lib/thumbnails.js';
 
 const byId = (id) => document.getElementById(id);
 const form = byId('search-form');
@@ -27,13 +28,40 @@ function escapeHtml(value = '') {
   })[character]);
 }
 
-function safeImageUrl(value) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'https:' ? parsed.href : '';
-  } catch {
-    return '';
+function thumbnailMarkup(item, glyph) {
+  const candidates = thumbnailCandidates(item.videoId, item.thumbnail);
+  if (!candidates.length) {
+    return `<div class="reference-thumb-fallback" aria-hidden="true">${glyph}</div>`;
   }
+  return `<img src="${escapeHtml(candidates[0])}" alt="" loading="lazy" decoding="async" data-fallbacks="${escapeHtml(JSON.stringify(candidates.slice(1)))}" data-fallback-glyph="${escapeHtml(glyph)}">`;
+}
+
+function bindThumbnailFallbacks(container) {
+  container.querySelectorAll('img[data-fallbacks]').forEach((img) => {
+    img.addEventListener('error', () => {
+      let candidates = [];
+      try {
+        candidates = JSON.parse(img.dataset.fallbacks || '[]');
+      } catch {
+        candidates = [];
+      }
+
+      const next = candidates.shift();
+      img.dataset.fallbacks = JSON.stringify(candidates);
+      if (next) {
+        img.src = next;
+        return;
+      }
+
+      // Broken-image icons look like broken UI. Show a deliberate placeholder
+      // only after every thumbnail source has failed.
+      const placeholder = document.createElement('div');
+      placeholder.className = 'reference-thumb-fallback';
+      placeholder.setAttribute('aria-hidden', 'true');
+      placeholder.textContent = img.dataset.fallbackGlyph || '▶';
+      img.replaceWith(placeholder);
+    });
+  });
 }
 
 function showFeedback(message, type = 'warning') {
@@ -86,12 +114,11 @@ function renderReferenceTracks() {
   }
 
   referenceContainer.innerHTML = tracks.map((track, index) => {
-    const image = safeImageUrl(track.thumbnail);
     const isSelected = track.videoId === selectedTrackId;
     return `
       <button class="reference-card ${isSelected ? 'selected' : ''}" type="button" data-track-id="${escapeHtml(track.videoId)}" aria-pressed="${isSelected}" title="Use this as the reference track">
         <div class="reference-thumb">
-          ${image ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="reference-thumb-fallback">♫</div>'}
+          ${thumbnailMarkup(track, '♫')}
           <span class="selected-check" aria-hidden="true">✓</span>
         </div>
         <div class="reference-info">
@@ -101,6 +128,7 @@ function renderReferenceTracks() {
         </div>
       </button>`;
   }).join('');
+  bindThumbnailFallbacks(referenceContainer);
 
   referenceContainer.querySelectorAll('[data-track-id]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -164,7 +192,6 @@ function renderVideoResults() {
   const ranked = orderedVideos(track);
   emptyVideos.classList.toggle('hidden', ranked.length > 0);
   videoContainer.innerHTML = ranked.map((video, index) => {
-    const image = safeImageUrl(video.thumbnail);
     const score = video.match.score;
     const official = video.uploaderVerified ? '<span class="micro-tag verified">✓ Verified channel</span>' : '';
     const sources = (video.sourceFilters || []).map((source) => source === 'music_videos' ? 'YT Music video' : source === 'videos' ? 'YouTube video' : source).slice(0, 2);
@@ -174,7 +201,7 @@ function renderVideoResults() {
     return `
       <article class="video-card ${index === 0 && sortSelect.value === 'score' ? 'is-top' : ''}">
         <a class="video-thumbnail" href="${escapeHtml(video.url)}" target="_blank" rel="noreferrer" aria-label="Open ${escapeHtml(video.title)} on YouTube">
-          ${image ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="reference-thumb-fallback">▶</div>'}
+          ${thumbnailMarkup(video, '▶')}
           <span class="rank-tag">#${index + 1}</span><span class="video-duration">${escapeHtml(formatDuration(video.duration))}</span>
         </a>
         <div class="video-info">
@@ -189,6 +216,7 @@ function renderVideoResults() {
         <details class="score-details"><summary>Inspect score breakdown</summary><div class="breakdown-grid">${scoreBreakdownMarkup(video)}</div></details>
       </article>`;
   }).join('');
+  bindThumbnailFallbacks(videoContainer);
 }
 
 function renderAll() {
