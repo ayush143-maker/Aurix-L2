@@ -3,11 +3,19 @@
   "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Standalone web prototype for matching YouTube Music tracks to YouTube video candidates.",
+  "description": "TrackMatch Lab web app and Capacitor Android wrapper.",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "android:copy-web": "node scripts/prepare-capacitor-web.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
   }
 }

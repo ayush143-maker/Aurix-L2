@@ -1,0 +1,8 @@
+{
+  "appId": "com.aurix.trackmatch",
+  "appName": "TrackMatch",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

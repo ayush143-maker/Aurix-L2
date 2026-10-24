@@ -1,0 +1,102 @@
+name: Build TrackMatch Android APK
+
+on:
+  push:
+    branches:
+      - feat/capacitor-android-apk
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: Public HTTPS API origin (must be reachable without Vercel SSO)
+        required: false
+        type: string
+        default: https://aurix-l2.vercel.app
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Configure API endpoint for native build
+        env:
+          TRACKMATCH_API_BASE_URL: ${{ github.event.inputs.api_base_url || vars.TRACKMATCH_API_BASE_URL || 'https://aurix-l2.vercel.app' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+
+          const value = (process.env.TRACKMATCH_API_BASE_URL || '').trim();
+          const parsed = new URL(value);
+          if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+              parsed.pathname !== '/' || parsed.search || parsed.hash) {
+            throw new Error('TRACKMATCH_API_BASE_URL must be an HTTPS origin, e.g. https://example.com');
+          }
+          const source = 'window.TRACKMATCH_API_BASE_URL = ' + JSON.stringify(parsed.origin) + ';' + String.fromCharCode(10);
+          writeFileSync('api-config.js', source, 'utf8');
+          console.log('Configured native API origin: ' + parsed.origin);
+          NODE
+
+      - name: Check API reachability (warning only)
+        env:
+          TRACKMATCH_API_BASE_URL: ${{ github.event.inputs.api_base_url || vars.TRACKMATCH_API_BASE_URL || 'https://aurix-l2.vercel.app' }}
+        run: |
+          set +e
+          status="$(curl -sSL --max-time 15 -o "$RUNNER_TEMP/api-health.json" -w '%{http_code}' "$TRACKMATCH_API_BASE_URL/api/health")"
+          if [ "$status" = "200" ] && grep -q '"ok":true' "$RUNNER_TEMP/api-health.json"; then
+            echo "API health check passed."
+          else
+            echo "::warning::API endpoint did not return public health JSON (HTTP $status). APK will still build, but search needs a publicly reachable API URL without Vercel SSO/deployment protection."
+          fi
+          exit 0
+
+      - name: Copy web files for Capacitor
+        run: npm run android:copy-web
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Sync Capacitor assets
+        run: npx cap sync android
+
+      - name: Build APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrackMatch-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

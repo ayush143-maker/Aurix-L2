@@ -5,7 +5,16 @@ const MAX_SEARCH_CACHE_ENTRIES = 30;
 const searchCache = new Map();
 const SEARCH_CACHE_CONTROL = 'public, max-age=0, s-maxage=45, stale-while-revalidate=120';
 
+function setCorsHeaders(res) {
+  // Search results are public metadata; allow the Capacitor WebView origin.
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'Accept, Content-Type');
+  res.setHeader('access-control-max-age', '86400');
+}
+
 function sendJson(res, statusCode, payload, cacheControl = 'no-store') {
+  setCorsHeaders(res);
   res.statusCode = statusCode;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.setHeader('cache-control', cacheControl);
@@ -13,6 +22,11 @@ function sendJson(res, statusCode, payload, cacheControl = 'no-store') {
 }
 
 export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    setCorsHeaders(res);
+    res.statusCode = 204;
+    return res.end();
+  }
   if (req.method !== 'GET') {
     res.setHeader('allow', 'GET');
     return sendJson(res, 405, { error: 'method_not_allowed', message: 'Use GET /api/search?query=...' });

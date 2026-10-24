@@ -1,6 +1,14 @@
 import { pipedSearch } from '../lib/piped.js';
 
 export default async function handler(req, res) {
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'Accept, Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.setHeader('cache-control', 'no-store');
 

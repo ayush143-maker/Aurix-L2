@@ -1,6 +1,7 @@
 import { rankCandidates, formatDuration } from './lib/scoring.js';
 import { thumbnailCandidates } from './lib/thumbnails.js';
 
+const TRACKMATCH_API_BASE_URL = String(globalThis.TRACKMATCH_API_BASE_URL || '').replace(/\/+$/, '');
 const byId = (id) => document.getElementById(id);
 const form = byId('search-form');
 const queryInput = byId('song-query');
@@ -270,7 +271,7 @@ async function performSearch(query) {
   loadingTitle.textContent = 'Searching music + video sources';
   loadingCopy.textContent = 'Looking up the reference and video candidates in parallel…';
   try {
-    const response = await fetch(`/api/search?query=${encodeURIComponent(normalizedQuery)}`, {
+    const response = await fetch(`${TRACKMATCH_API_BASE_URL}/api/search?query=${encodeURIComponent(normalizedQuery)}`, {
       headers: { accept: 'application/json' },
       signal: controller.signal,
     });

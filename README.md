@@ -128,3 +128,17 @@ The unit tests cover text similarity, duration formatting, bounded scores, versi
 - Piped public instance list: <https://github.com/TeamPiped/documentation/blob/main/content/docs/public-instances/index.md>
 - Vercel Functions: <https://vercel.com/docs/functions>
 - Vercel project configuration: <https://vercel.com/docs/project-configuration/vercel-json>
+
+
+## Android APK (Capacitor)
+
+A GitHub Actions workflow builds a sideloadable Android debug APK from the web UI.
+
+- Branch: `feat/capacitor-android-apk`
+- Workflow: `.github/workflows/android-apk.yml`
+- Trigger: push to this branch or **Actions → Build TrackMatch Android APK → Run workflow**
+- Artifact: `TrackMatch-Android-APK`; download the ZIP artifact and extract `app-debug.apk`.
+- Native setup: `capacitor.config.json`; the workflow generates the Android project and copies the needed web assets into ignored `www/`.
+- API URL: set the repository Actions variable `TRACKMATCH_API_BASE_URL`, or supply the `api_base_url` input when manually dispatching the workflow. It must be an HTTPS origin exposing `/api/search` and `/api/health` without sign-in or deployment-protection redirects. Default: `https://aurix-l2.vercel.app`.
+
+The current Vercel project has SSO deployment protection enabled. If it also protects the API alias, an APK cannot pass through that sign-in gate automatically; choose a public API origin or deliberately change deployment protection before distributing the APK. CI warns if the endpoint check fails but still builds the APK. This is a debug APK for sideload/testing, not a Play Store release-signed build.
