@@ -142,6 +142,7 @@ function renderReferenceTracks() {
 function scoreBreakdownMarkup(video) {
   const breakdown = video.match.breakdown;
   const entries = [
+    ['views', 'View-count signal'],
     ['title', 'Title similarity'],
     ['artist', 'Artist / channel'],
     ['duration', 'Duration'],
@@ -152,7 +153,9 @@ function scoreBreakdownMarkup(video) {
     const score = breakdown[key];
     const shown = score === null ? 'N/A' : `${score}%`;
     const width = score === null ? 0 : score;
-    const note = key === 'official'
+    const note = key === 'views'
+      ? (breakdown.viewsNote || 'View count is the strongest individual ranking signal when available.')
+      : key === 'official'
       ? 'Verified/official-name hints; not proof of ownership.'
       : key === 'duration'
         ? 'Closeness to reference duration.'
@@ -166,7 +169,7 @@ function scoreBreakdownMarkup(video) {
   const penalty = breakdown.versionPenalty > 0
     ? `<div class="penalty-note">−${breakdown.versionPenalty} points: ${escapeHtml(breakdown.versionLabel)}</div>`
     : `<div class="breakdown-note" style="margin-top:11px">No obvious version mismatch detected.</div>`;
-  return `${rows}${penalty}<div class="breakdown-note" style="margin-top:10px">ISRC identity: not available in Piped search metadata; omitted from this score.</div>`;
+  return `${rows}<div class="breakdown-note" style="margin-top:10px">Ranking order: first filter/down-rank audio-only, lyric/visualizer, cover, remix, live and short-form uploads; then prefer the most-viewed relevant music-video candidate. Match score breaks view-count ties.</div>${penalty}<div class="breakdown-note" style="margin-top:10px">ISRC identity: not available in Piped search metadata; omitted from this score.</div>`;
 }
 
 function orderedVideos(track) {
