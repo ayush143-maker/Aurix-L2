@@ -146,6 +146,7 @@ function scoreBreakdownMarkup(video) {
     ['artist', 'Artist / channel'],
     ['duration', 'Duration'],
     ['official', 'Official-channel hints'],
+    ['videoType', 'Music-video type'],
   ];
   const rows = entries.map(([key, label]) => {
     const score = breakdown[key];
@@ -157,7 +158,9 @@ function scoreBreakdownMarkup(video) {
         ? 'Closeness to reference duration.'
         : key === 'artist'
           ? 'Reference artist vs. uploader/title.'
-          : 'Normalized song-title overlap.';
+          : key === 'videoType'
+            ? (breakdown.videoTypeReason || 'Whether this looks like the original music video rather than an audio upload.')
+            : 'Normalized song-title overlap.';
     return `<div class="breakdown-item"><div class="breakdown-top"><span>${label}</span><strong>${shown}</strong></div><div class="breakdown-track"><span style="width:${width}%"></span></div><div class="breakdown-note">${note}</div></div>`;
   }).join('');
   const penalty = breakdown.versionPenalty > 0
@@ -194,7 +197,9 @@ function renderVideoResults() {
   videoContainer.innerHTML = ranked.map((video, index) => {
     const score = video.match.score;
     const official = video.uploaderVerified ? '<span class="micro-tag verified">✓ Verified channel</span>' : '';
-    const sources = (video.sourceFilters || []).map((source) => source === 'music_videos' ? 'YT Music video' : source === 'videos' ? 'YouTube video' : source).slice(0, 2);
+    const typeLabel = video.match.breakdown.videoTypeLabel || 'Unclassified video';
+    const typeTag = `<span class="micro-tag">${escapeHtml(typeLabel)}</span>`;
+    const sources = (video.sourceFilters || []).map((source) => source === 'music_videos' ? 'YT Music video search' : source === 'videos' ? 'YouTube video search' : source).slice(0, 2);
     const sourceTags = sources.map((source) => `<span class="micro-tag">${escapeHtml(source)}</span>`).join('');
     const artist = video.uploaderName || 'Uploader not provided';
     const viewText = video.views ? `${Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(video.views)} views` : 'Views unavailable';
@@ -205,7 +210,7 @@ function renderVideoResults() {
           <span class="rank-tag">#${index + 1}</span><span class="video-duration">${escapeHtml(formatDuration(video.duration))}</span>
         </a>
         <div class="video-info">
-          <div class="video-kicker">${sourceTags}${official}</div>
+          <div class="video-kicker">${typeTag}${sourceTags}${official}</div>
           <h3 class="video-title">${escapeHtml(video.title)}</h3>
           <div class="video-meta">${escapeHtml(artist)}<br>${escapeHtml(viewText)}${video.uploadedDate ? ` · ${escapeHtml(video.uploadedDate)}` : ''}</div>
         </div>
