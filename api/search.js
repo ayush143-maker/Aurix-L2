@@ -31,11 +31,20 @@ export default async function handler(req, res) {
     referenceError = error?.message || 'Reference search failed';
   }
 
+  // Use YouTube Music metadata to enrich the video queries. Searching only a
+  // bare title often returns Official Audio uploads; the target here is the
+  // original music video for the selected recording.
+  const seedGroups = referenceResult ? [{ items: referenceResult.items, filter: 'music_songs' }] : [];
+  const seedTrack = mergeStreams(seedGroups)[0] || null;
+  const seedTitle = String(seedTrack?.title || query).trim();
+  const seedArtist = String(seedTrack?.artist || seedTrack?.uploaderName || '').trim();
+  const enrichedQuery = [seedArtist, seedTitle].filter(Boolean).join(' ').trim() || query;
+
   const variants = [
-    { key: 'musicVideos', query, filter: 'music_videos', role: 'candidate' },
-    { key: 'videosMain', query, filter: 'videos', role: 'candidate' },
-    { key: 'videosOfficial', query: `${query} official video`, filter: 'videos', role: 'candidate' },
-    { key: 'videosAudio', query: `${query} official audio`, filter: 'videos', role: 'candidate' },
+    { key: 'musicVideos', query: enrichedQuery, filter: 'music_videos', role: 'candidate' },
+    { key: 'videosMain', query: enrichedQuery, filter: 'videos', role: 'candidate' },
+    { key: 'videosOfficial', query: `${enrichedQuery} official music video`, filter: 'videos', role: 'candidate' },
+    { key: 'videosArtist', query: `${seedArtist ? `${seedArtist} ` : ''}${seedTitle} official video`, filter: 'videos', role: 'candidate' },
   ];
 
   const settled = await Promise.allSettled(
@@ -60,8 +69,9 @@ export default async function handler(req, res) {
 
   const musicResults = fulfilled.find((group) => group.key === 'musicSongs');
   const musicVideoResults = fulfilled.find((group) => group.key === 'musicVideos');
-  const referenceGroups = [musicResults, musicVideoResults].filter(Boolean);
-  const referenceTracks = mergeStreams(referenceGroups).slice(0, 8);
+  // Keep the reference list sourced from YT Music song metadata only. YouTube
+  // music videos belong in the candidate set, not as substitute audio references.
+  const referenceTracks = mergeStreams([musicResults].filter(Boolean)).slice(0, 8);
   const videoGroups = fulfilled.filter((group) => group.role === 'candidate');
   const videoCandidates = mergeStreams(videoGroups);
 
@@ -84,7 +94,9 @@ export default async function handler(req, res) {
       failedSearches: failed.length,
       sources,
       filters: fulfilled.map(({ key, filter, query: searchQuery, items }) => ({ key, filter, query: searchQuery, resultCount: items.length })),
-      referenceMode: musicResults ? 'music_songs' : (musicVideoResults ? 'music_videos_fallback' : 'none'),
+      referenceMode: musicResults ? 'music_songs' : 'none',
+      rankingMode: 'original_music_video',
+      targetDescription: 'YT Music track metadata is the reference; original music videos are ranked above audio-only, lyric, and visualizer uploads.',
       warnings: [
         ...(referenceTracks.length ? [] : ['Piped returned no YT Music reference tracks for this query.']),
         ...(failed.length ? [`${failed.length} of ${variants.length + 1} search lookups failed; results may be incomplete.`] : []),
