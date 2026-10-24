@@ -2,6 +2,9 @@
   "functions": {
     "api/search.js": {
       "maxDuration": 20
+    },
+    "api/health.js": {
+      "maxDuration": 20
     }
   }
 }

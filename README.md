@@ -2,7 +2,7 @@
 
 A standalone, deployable prototype for experimenting with matching a YouTube Music song to likely corresponding YouTube videos before integrating the matching engine into Aurix.
 
-**Current version:** `0.1.0` · Static HTML/CSS/JS + Vercel Node.js serverless functions · No frontend framework or npm runtime dependencies.
+**Current version:** `0.1.1` · Static HTML/CSS/JS + Vercel Node.js serverless functions · No frontend framework or npm runtime dependencies.
 
 ## What it does
 
@@ -72,7 +72,7 @@ You can also deploy from the Vercel dashboard by importing this repository. The 
 
 1. Create a new GitHub repository named `aurix-trackmatch-lab` and upload/push the contents of this folder.
 2. In Vercel, choose **Add New → Project**, import that repository and deploy. No framework or build command is required.
-3. The default Piped host is `https://pipedapi.kavin.rocks`; optional fallback instances are configured in `lib/piped.js`.
+3. The default Piped host is `https://pipedapi.kavin.rocks`; `lib/piped.js` includes several documented public API fallbacks. The host list is best-effort because community-operated instances can disappear or rate-limit requests.
 4. If the default public instance is unavailable, add/update the environment variables below under **Project → Settings → Environment Variables**, then redeploy.
 
 | Variable | Required | Purpose |
@@ -96,19 +96,13 @@ The search endpoint returns JSON with `referenceTracks`, `videoCandidates` and l
 
 ### `GET /api/search?query=Song%20Artist`
 
-The server runs these lookups concurrently:
-
-- `music_songs` — preferred reference tracks
-- `music_videos` — additional YT Music video candidates and reference fallback
-- `videos` — broad video results
-- `videos` with `official video` appended
-- `videos` with `official audio` appended
+The server first searches `music_songs` to establish the reference-track source. It then searches `music_videos`, broad `videos`, `official video`, and `official audio` candidates. The first healthy Piped instance is reused for follow-up lookups; failed or empty lookups automatically fall back across small batches of additional public instances. This avoids making users configure a new host whenever one default instance goes offline.
 
 Results are de-duplicated by YouTube video ID. The frontend re-scores locally when the user selects a different reference track or changes the result order. This keeps the ranking model portable for later Aurix integration.
 
 ### `GET /api/health`
 
-Returns a small JSON health response for checking the deployment.
+Runs a real Piped search probe and returns whether the Vercel function and a Piped API instance are reachable. This is the first diagnostic endpoint to open when searching fails.
 
 ## Testing
 
@@ -120,7 +114,7 @@ The unit tests cover text similarity, duration formatting, bounded scores, versi
 
 ## Current limitations / next iteration
 
-- Piped public instances are not a guaranteed SLA. API lookups can fail or return partial data; the UI displays this rather than inventing candidates.
+- Piped public instances are community operated and not a guaranteed SLA. The API now tries multiple fallbacks and `/api/health` probes live Piped connectivity, but a total upstream outage can still prevent search results; the UI displays this rather than inventing candidates.
 - YT Music search may not return an artist or duration for every item.
 - No audio fingerprint comparison, ISRC lookup, video-stream probing or guarantee of identical master/edition is performed.
 - Query variants and score weights need evaluation against a labelled collection of songs where the correct video is known.

@@ -236,7 +236,7 @@ async function performSearch(query) {
     }
   } catch (error) {
     resultsSection.classList.add('hidden');
-    showFeedback(`${error.message || 'Something went wrong.'} Public Piped instances can be temporarily unavailable; retry or configure a working instance in Vercel.`, 'error');
+    showFeedback(`${error.message || 'Something went wrong.'} The backend tries several Piped instances automatically. Open /api/health on this deployment to see whether Piped is reachable.`, 'error');
   } finally {
     setLoading(false);
   }
