@@ -1,5 +1,4 @@
-import { pipedSearch } from '../lib/piped.js';
-import { mergeStreams } from '../lib/piped.js';
+import { pipedSearch, mergeStreams } from '../lib/piped.js';
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -22,8 +21,17 @@ export default async function handler(req, res) {
     return sendJson(res, 400, { error: 'query_too_long', message: 'Keep the song query under 160 characters.' });
   }
 
+  // Establish the reference track and a working API host first. Video searches
+  // then reuse that host where possible and fail over only when needed.
+  let referenceResult = null;
+  let referenceError = null;
+  try {
+    referenceResult = await pipedSearch(query, 'music_songs');
+  } catch (error) {
+    referenceError = error?.message || 'Reference search failed';
+  }
+
   const variants = [
-    { key: 'musicSongs', query, filter: 'music_songs', role: 'reference' },
     { key: 'musicVideos', query, filter: 'music_videos', role: 'candidate' },
     { key: 'videosMain', query, filter: 'videos', role: 'candidate' },
     { key: 'videosOfficial', query: `${query} official video`, filter: 'videos', role: 'candidate' },
@@ -31,10 +39,16 @@ export default async function handler(req, res) {
   ];
 
   const settled = await Promise.allSettled(
-    variants.map((variant) => pipedSearch(variant.query, variant.filter)),
+    variants.map((variant) => pipedSearch(variant.query, variant.filter, {
+      preferredInstance: referenceResult?.instance,
+    })),
   );
   const fulfilled = [];
   const failed = [];
+
+  if (referenceResult) fulfilled.push({ ...referenceResult, key: 'musicSongs', role: 'reference' });
+  else failed.push({ key: 'musicSongs', filter: 'music_songs', message: referenceError || 'Reference search failed' });
+
   settled.forEach((result, index) => {
     const variant = variants[index];
     if (result.status === 'fulfilled') {
@@ -54,7 +68,7 @@ export default async function handler(req, res) {
   if (!fulfilled.length) {
     return sendJson(res, 502, {
       error: 'piped_unavailable',
-      message: 'Piped API instances did not respond. Try again or configure a working instance in Vercel environment variables.',
+      message: 'No Piped API instance could be reached from this deployment. The app tried its configured and built-in fallback hosts; their status can change. Check the API diagnostics and retry.',
       details: failed.map(({ key, message }) => ({ key, message })),
     });
   }
@@ -73,7 +87,7 @@ export default async function handler(req, res) {
       referenceMode: musicResults ? 'music_songs' : (musicVideoResults ? 'music_videos_fallback' : 'none'),
       warnings: [
         ...(referenceTracks.length ? [] : ['Piped returned no YT Music reference tracks for this query.']),
-        ...(failed.length ? [`${failed.length} of ${variants.length} search lookups failed; results may be incomplete.`] : []),
+        ...(failed.length ? [`${failed.length} of ${variants.length + 1} search lookups failed; results may be incomplete.`] : []),
       ],
     },
   });
