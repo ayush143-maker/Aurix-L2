@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://www.youtube-nocookie.com">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/editorial.css">
+  <link rel="stylesheet" href="/player-stage.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/player-ui.js"></script>
 </head>
@@ -34,6 +35,10 @@
       <div class="quick-searches" aria-label="Example searches"><span>TRY</span><button type="button" data-query="Kesariya">Kesariya</button><button type="button" data-query="Dandelions Ruth B">Dandelions</button><button type="button" data-query="Blinding Lights The Weeknd">Blinding Lights</button></div>
     </section>
     <section id="feedback" class="feedback hidden" role="status" aria-live="polite"></section>
+    <section id="main-player-stage" class="main-player-stage" aria-label="Selected video player">
+      <div class="main-player-frame"><div class="main-player-placeholder"><span>▶</span><p>Choose a song or video to play it here</p></div></div>
+      <div class="main-player-meta"><div><span class="main-player-kicker">NOW PLAYING</span><h3 class="main-player-title">Nothing playing yet</h3></div><a class="main-player-external" target="_blank" rel="noreferrer" hidden>Watch on YouTube ↗</a></div>
+    </section>
     <section id="results-section" class="results-section hidden" aria-live="polite">
       <div class="section-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR SEARCH</div><h2>Choose a reference</h2><p>Pick the correct YT Music version, then compare up to seven video matches.</p></div><div id="search-stats" class="stats-stack"></div></div>
       <div id="reference-tracks" class="reference-grid"></div>
