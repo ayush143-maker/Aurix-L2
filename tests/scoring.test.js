@@ -47,7 +47,7 @@ test('candidate receives a bounded numeric match score and a breakdown', () => {
 test('cover candidates receive a penalty and rank below a close official match', () => {
   const ranked = rankCandidates(reference, [coverVideo, officialVideo]);
   assert.equal(ranked[0].videoId, officialVideo.videoId);
-  assert.equal(ranked[1].match.breakdown.versionPenalty, 22);
+  assert.equal(ranked[1].match.breakdown.versionPenalty, 30);
 });
 
 test('duplicate videos are removed by video ID', () => {

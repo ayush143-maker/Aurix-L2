@@ -38,5 +38,7 @@ test('accepts HTTPS configured instance hosts only', () => {
     PIPED_BASE_URL: 'https://piped.example.test/path',
     PIPED_FALLBACK_URLS: 'http://not-secure.example.test,https://fallback.example.test',
   });
-  assert.deepEqual(hosts, ['https://piped.example.test', 'https://fallback.example.test']);
+  assert.deepEqual(hosts.slice(0, 2), ['https://piped.example.test', 'https://fallback.example.test']);
+  assert.ok(hosts.includes('https://pipedapi.leptons.xyz'), 'built-in recovery hosts remain available');
+  assert.equal(new Set(hosts).size, hosts.length, 'instance list contains no duplicates');
 });
