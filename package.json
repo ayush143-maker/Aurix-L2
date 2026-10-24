@@ -1,0 +1,13 @@
+{
+  "name": "aurix-trackmatch-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone web prototype for matching YouTube Music tracks to YouTube video candidates.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
